@@ -1,0 +1,11 @@
+# Task runner
+.task/
+
+# LaTeX auxiliary files
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.pdf

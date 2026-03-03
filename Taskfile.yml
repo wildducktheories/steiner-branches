@@ -1,0 +1,38 @@
+version: '3'
+
+includes:
+  papers:
+    taskfile: ./papers/Taskfile.yml
+    dir: ./papers
+
+tasks:
+  paper:build:
+    desc: Build the paper PDF
+    cmds:
+      - task: papers:build
+
+  paper:clean:
+    desc: Clean LaTeX auxiliary files
+    cmds:
+      - task: papers:clean
+
+  paper:clean-all:
+    desc: Clean all generated files including PDF
+    cmds:
+      - task: papers:clean-all
+
+  paper:view:
+    desc: Open the paper PDF
+    cmds:
+      - task: papers:view
+
+  paper:
+    desc: Build and view the paper
+    cmds:
+      - task: papers:build
+      - task: papers:view
+
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list

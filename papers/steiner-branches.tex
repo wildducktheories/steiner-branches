@@ -1,0 +1,300 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{setspace}
+
+\geometry{margin=1in}
+\onehalfspacing
+
+\title{Branch Formulas for the Collatz Map\\
+\large A First-Principles Derivation via Steiner Circuits}
+\author{Jon Seymour\\ \texttt{jon@wildducktheories.com}\\ Sydney}
+\date{March 1, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present a complete derivation of the branch formulas \(A(n,x)\), \(B(n,x)\),
+and their common endpoint \(C(n,x)\) for the Collatz map. These formulas classify
+odd integers according to initial parity patterns and arise naturally from the
+closure conditions of canonical Steiner circuits. The derivation is fully
+first-principles and independent of any global convergence claim.
+\end{abstract}
+
+\section{Introduction}
+
+The Collatz map is defined by
+\[
+T(n) =
+\begin{cases}
+n/2, & n \text{ even},\\[2mm]
+(3n+1)/2, & n \text{ odd}.
+\end{cases}
+\]
+
+A fruitful approach to analyzing Collatz trajectories is to group integers
+according to their parity patterns rather than numerical magnitude. Odd integers
+can be organized into \emph{branches} determined by finite parity sequences that
+govern the initial segment of their trajectory.
+
+The branch framework studied here—together with the explicit formulas
+\(A(n,x), B(n,x), C(n,x)\)—is inspired by the structural approach introduced
+in Neel Alkoraishi’s preprint
+\emph{A Bit-Length and Branch-Based Proof of the Collatz Conjecture}, Version~10.\footnote{
+Neel Alkoraishi, ``A Bit-Length and Branch-Based Proof of the Collatz Conjecture,''
+Version~10, Zenodo (2026),
+\url{https://doi.org/10.5281/zenodo.18736864}.}
+This work isolates the algebraic content of the branch framework without
+adopting any global convergence claims.
+
+\section{Parity Vectors and Steiner Circuits}
+
+A \emph{parity vector} (or \emph{Steiner circuit})\cite{Steiner1977} of length \(m\) is a finite
+sequence
+\[
+\sigma = (\sigma_0, \dots, \sigma_{m-1}), \quad \sigma_i \in \{E,O\},
+\]
+where \(E\) denotes the map \(x \mapsto x/2\) and \(O\) denotes \(x \mapsto (3x+1)/2\).
+
+Composing the Collatz map along a circuit yields an affine map
+\[
+x \longmapsto \frac{3^k x + c}{2^m},
+\]
+where \(k\) is the number of odd steps and \(c\) is determined by the circuit.
+Integrality imposes congruence conditions on \(x\), which determine the
+admissible odd integers in the branch.
+
+\section{The Canonical Circuit \((OE)^n\)}
+
+We focus on the canonical circuit
+\[
+(OE)^n = OEOE\cdots OE,
+\]
+with \(n\) repetitions. This circuit has length \(2n\) and contains exactly
+\(n\) odd steps. Composing the Collatz map along this circuit gives
+\[
+T^{(OE)^n}(N) = \frac{3^n N + K_n}{2^n}, \qquad 
+K_n := \sum_{j=0}^{n-1} 3^j 2^{\,n-1-j}.
+\]
+
+The integrality condition requires
+\[
+3^n N + K_n \equiv 0 \pmod{2^n}.
+\]
+
+---
+
+\section{Derivation of the Branch Formulas}
+
+\subsection*{Step 1: Integrality condition}
+
+For \(T^{(OE)^n}(N)\) to be an integer, we must satisfy
+\[
+3^n N + K_n \equiv 0 \pmod{2^n}.
+\]
+
+\subsection*{Step 2: Evaluate \(K_n\) modulo \(2^{n+1}\)}
+
+Reducing \(K_n\) modulo \(2^{n+1}\) gives
+\[
+K_n \equiv
+\begin{cases}
+2^{n-1}, & n \text{ even},\\[1mm]
+3 \cdot 2^{n-1}, & n \text{ odd},
+\end{cases}
+\pmod{2^{n+1}}.
+\]
+
+---
+
+\subsection*{Step 3: Lift solutions modulo \(2^n\) to \(2^{n+1}\)}
+
+Let \(N_0\) be a solution modulo \(2^n\). Then all solutions modulo \(2^{n+1}\)
+are
+\[
+N = N_0 + t \cdot 2^n, \quad t = 0 \text{ or } 1.
+\]
+
+This standard lifting procedure shows there are exactly two odd residues modulo
+\(2^{n+1}\), corresponding to the two branches \(A\) and \(B\).
+
+---
+
+\subsection*{Step 4: Solve explicitly for residues}
+
+\textbf{Even \(n\)}:
+\[
+N \equiv 2^{n-1}-1 \quad \text{or} \quad 2^n-1 \pmod{2^{n+1}}.
+\]
+
+\textbf{Odd \(n\)}:
+\[
+N \equiv 3\cdot 2^{n-1}-1 \quad \text{or} \quad 3\cdot 2^n-1 \pmod{2^{n+1}}.
+\]
+
+These are the “base” values for the two branches.
+
+---
+
+\subsection*{Step 5: Introduce the enumeration parameter \(x\)}
+
+All integers in the same residue class modulo \(2^{n+1}\) can be written as
+\[
+N = N_{\text{base}} + k \cdot 2^{\,n+1}, \quad k \ge 0.
+\]
+
+- \(N_{\text{base}}\) is one of the two residues from Step 4.  
+- \(k\) enumerates all integers in the residue class.  
+- Define \(x := k\), which arises naturally from modular arithmetic.
+
+Thus \(x\) is not arbitrary; it indexes all odd integers in the branch.
+
+---
+
+\subsection*{Step 6: Final branch formulas}
+
+\[
+A(n,x) =
+\begin{cases}
+3\cdot 2^{n-1} + 2^{n+1}x - 1, & n \text{ odd},\\[1mm]
+2^{n-1} + 2^{n+1}x - 1, & n \text{ even},
+\end{cases}
+\]
+
+\[
+B(n,x) =
+\begin{cases}
+3\cdot 2^{n} + 2^{n+2}x - 1, & n \text{ odd},\\[1mm]
+2^{n} + 2^{n+2}x - 1, & n \text{ even}.
+\end{cases}
+\]
+
+These formulas enumerate all odd integers beginning with the canonical
+\((OE)^n\) circuit.
+
+---
+
+\section{Branch Endpoints}
+
+Substituting \(A(n,x)\) or \(B(n,x)\) into the affine map yields the common
+endpoint
+\[
+C(n,x) = 2 \cdot 3^n x + 4 \sum_{i=0}^{\lfloor (n-1)/2 \rfloor} 9^i.
+\]
+
+Properties:
+
+\begin{itemize}
+\item \(C(n,x)\) is always even;
+\item \(C(n,x)\) is divisible by \(4\);
+\item both \(A(n,x)\) and \(B(n,x)\) reach \(C(n,x)\) after exactly \(n\)
+odd steps.
+\end{itemize}
+
+This endpoint arises directly from the combinatorial and arithmetic structure
+of the circuit, independent of any global convergence argument.
+
+---
+
+\section{Scope and Non-Claims}
+
+The derivation above is entirely algebraic:
+
+- No claim is made regarding global convergence of the Collatz map.
+- No layer induction or global ranking invariant is assumed.
+- The formulas \(A(n,x), B(n,x), C(n,x)\) are mathematically meaningful on
+their own.
+
+\section{Conclusion}
+
+We have derived, from first principles, the explicit branch formulas
+\(A(n,x), B(n,x)\) and the associated endpoint \(C(n,x)\), using canonical
+Steiner circuits and modular arithmetic. This fully captures the structural
+content of the branch framework and clarifies the role of the enumeration
+parameter \(x\) in indexing all integers in a given branch.
+
+\appendix
+
+\section{Use of AI}
+
+This paper was generated with the assistance of artificial intelligence tools.
+The initial draft of the mathematical content, derivations, and structure were
+produced using OpenAI's ChatGPT (GPT-4) in a conversation available at:
+
+\begin{quote}
+\url{https://chatgpt.com/c/69a3a8d5-0d90-8322-849f-4c43cf6ecc40}
+\end{quote}
+
+Subsequent editing, including the addition of author metadata, location,
+citation of Steiner's 1977 paper, and this appendix, was performed using
+Anthropic's Claude (Claude Sonnet 4.5) via Claude Code on March 1, 2026.
+
+\subsection*{Original Prompts}
+
+The paper was generated through an iterative dialogue with ChatGPT. The
+key prompts in chronological order were:
+
+\begin{enumerate}
+\item Initial context-setting prompt establishing the mathematical framework,
+including definitions of the Collatz map, branch formulae \(A(n,x)\) and
+\(B(n,x)\), endpoint formula \(C(n,x)\), binary decomposition insights, and
+agreement to focus on the branch framework independently of convergence claims.
+
+\item ``What I would like to do is highlight the relationship between the
+\(A,B,C\) and Steiner circuits. I'd also like to provide a complete derivation
+for \(A,B,C\) from first principles.''
+
+\item ``Please ensure that you cite the original paper
+(\url{https://zenodo.org/records/18736864}) (specifically Version 10) as the
+original inspiration for this write up.''
+
+\item ``Can you explain the 3 different styles?'' [referring to citation styles
+APA, MLA, and Chicago]
+
+\item ``Ok, let's use Chicago style. Please generate the full LaTeX source as
+discussed.''
+
+\item ``I am not convinced by the Step 5 here - I think you need to show how
+\(x\) is derived from what comes before.'' [requesting clarification of the
+derivation of the enumeration parameter]
+\end{enumerate}
+
+\subsection*{AI Contributions}
+
+\textbf{ChatGPT} (initial generation):
+\begin{itemize}
+\item Generated the complete mathematical derivation and proof structure
+\item Formulated the abstract, introduction, and conclusion
+\item Produced the LaTeX formatting and document organization
+\item Developed the step-by-step presentation of the branch formula derivation
+\end{itemize}
+
+\textbf{Claude Code} (subsequent editing):
+\begin{itemize}
+\item Added author information (Jon Seymour, \texttt{jon@wildducktheories.com}, Sydney)
+\item Set document date to March 1, 2026
+\item Researched and added the citation for Steiner's 1977 paper
+\item Created bibliography section
+\item Configured Makefile build system for PDF generation
+\item Added this AI usage disclosure appendix
+\end{itemize}
+
+All mathematical content, reasoning, and exposition were AI-generated.
+Human input consisted of high-level direction, verification of mathematical
+correctness, and editorial decisions.
+
+\begin{thebibliography}{9}
+
+\bibitem{Steiner1977}
+R.~P.~Steiner,
+\emph{A theorem on the syracuse problem},
+Proceedings of the 7th Manitoba Conference on Numerical Mathematics,
+Utilitas Mathematica Publishing, Winnipeg, MB, Canada,
+pp.~553--559, 1977.
+
+\end{thebibliography}
+
+\end{document}

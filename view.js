@@ -25,17 +25,24 @@ let latticeData = [];
 let connections = [];
 let hoveredPoint = null;
 let selectedValue = null;
-let useLogScale = false;
 let showBoundaries = true; // Show circuit boundary lines
 let trajectoryValues = new Set(); // Global trajectory values
 let trajectorySequence = []; // Global trajectory sequence
 let currentPoint = null; // Current lattice point
 let currentCircuitValue = null; // C value of current circuit
+let nodeDistances = new Map(); // Distance from current point to each node
+let isAnimating = false; // Animation state
+let animationInterval = null; // Animation interval ID
 
 /**
  * Initialize visualization with given parameters
  */
 function initialize(startValue) {
+  // Stop any ongoing animation when reinitializing
+  if (isAnimating) {
+    stopAnimation();
+  }
+
   if (!startValue) {
     latticeData = [];
     connections = [];
@@ -106,15 +113,10 @@ function initialize(startValue) {
   // Don't add C(n,x) points to lattice - they won't be rendered
   // C values will still appear in tooltips
 
-  // Set canvas size (n on x-axis, x on y-axis)
+  // Set canvas size (n on x-axis, x on y-axis with log scale)
   canvas.width = (maxN + 2) * CONFIG.cellSize + 2 * CONFIG.padding;
-
-  if (useLogScale) {
-    // Fixed height for log scale
-    canvas.height = 600 + 2 * CONFIG.padding;
-  } else {
-    canvas.height = (maxX + 2) * CONFIG.cellSize + 2 * CONFIG.padding;
-  }
+  // Fixed height for log scale
+  canvas.height = 600 + 2 * CONFIG.padding;
 
   // Compute connections
   computeConnections(startValue);
@@ -157,6 +159,9 @@ function computeConnections(startValue) {
     }
   }
 
+  // Calculate distances from current point
+  calculateNodeDistances();
+
   // Create connections for visualization
   for (let i = 0; i < trajectory.length - 1; i++) {
     const from = trajectory[i];
@@ -181,49 +186,174 @@ function computeConnections(startValue) {
 
 /**
  * Convert (n,x) lattice coordinates to screen coordinates
- * n is on x-axis, x is on y-axis (possibly log scale)
+ * n is on x-axis, x is on y-axis (log scale)
  */
 function latticeToScreen(n, x) {
   const screenX = CONFIG.padding + n * CONFIG.cellSize;
 
-  let screenY;
-  if (useLogScale && x > 0) {
-    // Log base 3 scale for y-axis
-    const logX = Math.log(x + 1) / Math.log(3);  // log3(x+1) to handle x=0
-    const maxX = Math.max(...latticeData.map(p => p.x));
-    const maxLogX = Math.log(maxX + 1) / Math.log(3);
-    const normalizedY = maxLogX > 0 ? logX / maxLogX : 0;
-    const maxScreenY = canvas.height - 2 * CONFIG.padding;
-    screenY = canvas.height - CONFIG.padding - normalizedY * maxScreenY;
-  } else {
-    // Linear scale
-    screenY = canvas.height - CONFIG.padding - x * CONFIG.cellSize;
-  }
+  // Log base 3 scale for y-axis
+  const logX = Math.log(x + 1) / Math.log(3);  // log3(x+1) to handle x=0
+  const maxX = Math.max(...latticeData.map(p => p.x));
+  const maxLogX = Math.log(maxX + 1) / Math.log(3);
+  const normalizedY = maxLogX > 0 ? logX / maxLogX : 0;
+  const maxScreenY = canvas.height - 2 * CONFIG.padding;
+  const screenY = canvas.height - CONFIG.padding - normalizedY * maxScreenY;
 
   return { x: screenX, y: screenY };
 }
 
 /**
  * Convert screen coordinates to lattice coordinates
- * n is on x-axis, x is on y-axis
+ * n is on x-axis, x is on y-axis (log scale)
  */
 function screenToLattice(screenX, screenY) {
   const n = Math.round((screenX - CONFIG.padding) / CONFIG.cellSize);
 
-  let x;
-  if (useLogScale) {
-    // Inverse of log base 3 scale
-    const maxX = Math.max(...latticeData.map(p => p.x));
-    const maxLogX = Math.log(maxX + 1) / Math.log(3);
-    const maxScreenY = canvas.height - 2 * CONFIG.padding;
-    const normalizedY = (canvas.height - screenY - CONFIG.padding) / maxScreenY;
-    const logX = normalizedY * maxLogX;
-    x = Math.round(Math.pow(3, logX) - 1);
-  } else {
-    x = Math.round((canvas.height - screenY - CONFIG.padding) / CONFIG.cellSize);
-  }
+  // Inverse of log base 3 scale
+  const maxX = Math.max(...latticeData.map(p => p.x));
+  const maxLogX = Math.log(maxX + 1) / Math.log(3);
+  const maxScreenY = canvas.height - 2 * CONFIG.padding;
+  const normalizedY = (canvas.height - screenY - CONFIG.padding) / maxScreenY;
+  const logX = normalizedY * maxLogX;
+  const x = Math.round(Math.pow(3, logX) - 1);
 
   return { n, x };
+}
+
+/**
+ * Calculate distance from current point to all nodes in the circuit
+ * Distance is the number of steps along the trajectory path
+ */
+function calculateNodeDistances() {
+  nodeDistances = new Map();
+
+  if (!currentPoint || trajectorySequence.length === 0) {
+    return;
+  }
+
+  // Find index of current point in trajectory
+  let currentIndex = -1;
+  for (let i = 0; i < trajectorySequence.length; i++) {
+    const step = trajectorySequence[i];
+    if (step.isOdd && step.value === currentPoint.value) {
+      currentIndex = i;
+      break;
+    }
+  }
+
+  if (currentIndex === -1) {
+    return;
+  }
+
+  // Calculate distance to all odd points in trajectory
+  // Negative distance = predecessor (comes before)
+  // Positive distance = successor (comes after)
+  // Zero = current point
+  for (let i = 0; i < trajectorySequence.length; i++) {
+    const step = trajectorySequence[i];
+    if (step.isOdd) {
+      const branch = SteinerBranches.findBranch(step.value);
+      if (branch) {
+        const key = `${branch.branch}:${branch.n}:${branch.x}:${step.value}`;
+        const distance = i - currentIndex;
+        nodeDistances.set(key, distance);
+      }
+    }
+  }
+}
+
+/**
+ * Navigate to next point in trajectory
+ */
+function navigateToNextPoint() {
+  if (trajectorySequence.length === 0) return;
+
+  // Build ordered list of plotted points from trajectory sequence
+  const plottedPoints = [];
+  for (const step of trajectorySequence) {
+    if (step.isOdd) {
+      // Find the correct lattice point for this odd value
+      const branch = SteinerBranches.findBranch(step.value);
+      if (branch) {
+        // Find the specific point matching the branch formula
+        const matchingPoint = latticeData.find(p =>
+          p.value === step.value &&
+          p.branch === branch.branch &&
+          p.n === branch.n &&
+          p.x === branch.x
+        );
+        if (matchingPoint) {
+          plottedPoints.push(matchingPoint);
+        }
+      }
+    }
+  }
+
+  if (plottedPoints.length === 0) return;
+
+  // Find current point index
+  let currentIndex = -1;
+  if (currentPoint) {
+    currentIndex = plottedPoints.findIndex(p =>
+      p.value === currentPoint.value &&
+      p.branch === currentPoint.branch &&
+      p.n === currentPoint.n &&
+      p.x === currentPoint.x
+    );
+  }
+
+  // Next point
+  currentIndex = (currentIndex + 1) % plottedPoints.length;
+
+  // Set new current point
+  currentPoint = plottedPoints[currentIndex];
+  currentCircuitValue = SteinerBranches.C(currentPoint.n, currentPoint.x);
+
+  // Recalculate distances from new current point
+  calculateNodeDistances();
+
+  // Update info panel
+  updateInfoPanel(currentPoint);
+
+  // Set as hovered to show tooltip
+  hoveredPoint = currentPoint;
+
+  render();
+}
+
+/**
+ * Start animation
+ */
+function startAnimation() {
+  if (isAnimating) return;
+
+  isAnimating = true;
+  // Animate at 500ms intervals (2 steps per second)
+  animationInterval = setInterval(navigateToNextPoint, 500);
+}
+
+/**
+ * Stop animation
+ */
+function stopAnimation() {
+  if (!isAnimating) return;
+
+  isAnimating = false;
+  if (animationInterval) {
+    clearInterval(animationInterval);
+    animationInterval = null;
+  }
+}
+
+/**
+ * Toggle animation on/off
+ */
+function toggleAnimation() {
+  if (isAnimating) {
+    stopAnimation();
+  } else {
+    startAnimation();
+  }
 }
 
 /**
@@ -315,22 +445,11 @@ function drawGrid() {
     ctx.stroke();
   }
 
-  // Horizontal lines (constant x)
-  if (useLogScale) {
-    // Draw grid lines at powers of 3
-    const maxLog3 = Math.log(maxX + 1) / Math.log(3);
-    for (let i = 0; i <= maxLog3; i++) {
-      const x = Math.pow(3, i) - 1;
-      if (x <= maxX) {
-        const screen = latticeToScreen(0, x);
-        ctx.beginPath();
-        ctx.moveTo(CONFIG.padding, screen.y);
-        ctx.lineTo(canvas.width - CONFIG.padding, screen.y);
-        ctx.stroke();
-      }
-    }
-  } else {
-    for (let x = 0; x <= maxX + 1; x++) {
+  // Horizontal lines (constant x) - draw grid lines at powers of 3
+  const maxLog3 = Math.log(maxX + 1) / Math.log(3);
+  for (let i = 0; i <= maxLog3; i++) {
+    const x = Math.pow(3, i) - 1;
+    if (x <= maxX) {
       const screen = latticeToScreen(0, x);
       ctx.beginPath();
       ctx.moveTo(CONFIG.padding, screen.y);
@@ -474,98 +593,11 @@ function drawCircuitBoundaries() {
 }
 
 /**
- * Draw Collatz connections
+ * Draw Collatz connections (now disabled for wave visualization)
  */
 function drawConnections() {
-  for (const conn of connections) {
-    // Find lattice points for from and to values
-    const fromPoints = latticeData.filter(p => p.value === conn.from);
-    const toPoints = latticeData.filter(p => p.value === conn.to);
-
-    // Draw connection from each matching point
-    for (const fromPt of fromPoints) {
-      for (const toPt of toPoints) {
-        const from = latticeToScreen(fromPt.n, fromPt.x);
-        const to = latticeToScreen(toPt.n, toPt.x);
-
-        // Apply same offsets as the rendered circles
-        let fromOffsetX = 0, fromOffsetY = 0;
-        if (fromPt.branch === 'A') {
-          fromOffsetX = -4; fromOffsetY = -4; // top left
-        } else if (fromPt.branch === 'B') {
-          fromOffsetX = -4; fromOffsetY = 4; // bottom left
-        } else if (fromPt.branch === 'C') {
-          fromOffsetX = 4; fromOffsetY = 0; // middle right
-        }
-
-        let toOffsetX = 0, toOffsetY = 0;
-        if (toPt.branch === 'A') {
-          toOffsetX = -4; toOffsetY = -4; // top left
-        } else if (toPt.branch === 'B') {
-          toOffsetX = -4; toOffsetY = 4; // bottom left
-        } else if (toPt.branch === 'C') {
-          toOffsetX = 4; toOffsetY = 0; // middle right
-        }
-
-        const fromX = from.x + fromOffsetX;
-        const fromY = from.y + fromOffsetY;
-        const toX = to.x + toOffsetX;
-        const toY = to.y + toOffsetY;
-
-        // Check if this connection is within the current circuit
-        // Only check for odd-to-odd connections (skip odd-to-even and even-to-odd)
-        let isInCurrentCircuit = false;
-        if (fromPt.value % 2n === 1n && toPt.value % 2n === 1n) {
-          const fromC = SteinerBranches.C(fromPt.n, fromPt.x);
-          const toC = SteinerBranches.C(toPt.n, toPt.x);
-          // Same circuit and matches current circuit
-          isInCurrentCircuit = currentCircuitValue !== null &&
-                              fromC === toC &&
-                              fromC === currentCircuitValue;
-        }
-
-        // Color based on the source point's branch
-        let lineColor;
-        if (fromPt.branch === 'A') {
-          lineColor = CONFIG.colors.branchA;
-        } else if (fromPt.branch === 'B') {
-          lineColor = CONFIG.colors.branchB;
-        } else if (fromPt.branch === 'C') {
-          lineColor = CONFIG.colors.endpoint;
-        } else {
-          lineColor = CONFIG.colors.connection;
-        }
-
-        // Brighten color and increase width if in current circuit
-        if (isInCurrentCircuit) {
-          // Brighten the color
-          if (fromPt.branch === 'A') {
-            lineColor = '#6fb9ff'; // Brighter blue
-          } else if (fromPt.branch === 'B') {
-            lineColor = '#ff8b8b'; // Brighter red
-          }
-          ctx.lineWidth = 4;
-        } else {
-          ctx.lineWidth = 2;
-        }
-
-        ctx.strokeStyle = lineColor;
-        ctx.setLineDash([5, 5]);
-        ctx.beginPath();
-        ctx.moveTo(fromX, fromY);
-        ctx.lineTo(toX, toY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Draw arrow
-        drawArrow(fromX, fromY, toX, toY, lineColor);
-      }
-    }
-  }
-
-  // Reset line dash and width
-  ctx.setLineDash([]);
-  ctx.lineWidth = 1;
+  // Connections are now removed for wave-based visualization
+  // All visualization happens through node colors and sizes
 }
 
 /**
@@ -591,12 +623,11 @@ function drawArrow(x1, y1, x2, y2, color) {
 }
 
 /**
- * Draw lattice points
+ * Draw lattice points with wave-based visualization
  */
 function drawLatticePoints() {
   for (const point of latticeData) {
     const screen = latticeToScreen(point.n, point.x);
-    const isSelected = selectedValue !== null && point.value === selectedValue;
     const isHovered = hoveredPoint === point;
 
     // Check if this value appears in the trajectory (use global trajectoryValues)
@@ -607,21 +638,17 @@ function drawLatticePoints() {
       continue; // Skip this point
     }
 
-    // Determine color and offset based on branch type
-    let color;
+    // Determine offset based on branch type
     let offsetX = 0;
     let offsetY = 0;
 
     if (point.branch === 'A') {
-      color = CONFIG.colors.branchA;
       offsetX = -4; // top left
       offsetY = -4;
     } else if (point.branch === 'B') {
-      color = CONFIG.colors.branchB;
       offsetX = -4; // bottom left
       offsetY = 4;
     } else if (point.branch === 'C') {
-      color = CONFIG.colors.endpoint;
       offsetX = 4;  // middle right
       offsetY = 0;
     }
@@ -630,8 +657,51 @@ function drawLatticePoints() {
     const drawX = screen.x + offsetX;
     const drawY = screen.y + offsetY;
 
-    // Use constant radius for all points
-    const radius = CONFIG.pointRadius;
+    // Get distance from current point for wave visualization
+    const key = `${point.branch}:${point.n}:${point.x}:${point.value}`;
+    const distance = nodeDistances.get(key);
+
+    let radius = CONFIG.pointRadius;
+    let color;
+
+    if (distance === undefined) {
+      // Not in wave - use small default
+      radius = CONFIG.pointRadius;
+      if (point.branch === 'A') {
+        color = CONFIG.colors.branchA;
+      } else if (point.branch === 'B') {
+        color = CONFIG.colors.branchB;
+      } else {
+        color = CONFIG.colors.endpoint;
+      }
+    } else if (distance === 0) {
+      // Current point - largest green circle
+      radius = 12;
+      color = '#4eff9e'; // Green
+    } else {
+      // Wave effect based on distance
+      const absDistance = Math.abs(distance);
+
+      // Radius decreases with distance
+      radius = Math.max(4, 12 - absDistance * 1.5);
+
+      // Color based on direction
+      if (distance > 0) {
+        // Successor (comes after) - blue gradient
+        const intensity = Math.max(0.3, 1 - absDistance * 0.1);
+        const r = Math.floor(74 * intensity);
+        const g = Math.floor(158 * intensity);
+        const b = Math.floor(255 * intensity);
+        color = `rgb(${r}, ${g}, ${b})`;
+      } else {
+        // Predecessor (comes before) - red gradient
+        const intensity = Math.max(0.3, 1 - absDistance * 0.1);
+        const r = Math.floor(255 * intensity);
+        const g = Math.floor(107 * intensity);
+        const b = Math.floor(107 * intensity);
+        color = `rgb(${r}, ${g}, ${b})`;
+      }
+    }
 
     // Draw point - solid color, no stroke
     ctx.beginPath();
@@ -639,14 +709,14 @@ function drawLatticePoints() {
     ctx.fillStyle = color;
     ctx.fill();
 
-    // Optional: thin stroke for selected/hovered only
-    if (isSelected || isHovered) {
+    // Optional: thin stroke for hovered only
+    if (isHovered) {
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
       ctx.stroke();
     }
 
-    // Draw sign indicator with smaller font
+    // Draw sign indicator with appropriate font size
     let sign;
     if (point.branch === 'A') {
       sign = '-';
@@ -656,7 +726,8 @@ function drawLatticePoints() {
       sign = '=';
     }
     ctx.fillStyle = '#000'; // Black text
-    ctx.font = 'bold 10px sans-serif';
+    const fontSize = Math.max(8, Math.min(12, radius * 0.8));
+    ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(sign, drawX, drawY);
@@ -675,14 +746,13 @@ function drawLabels() {
   ctx.textBaseline = 'top';
   ctx.fillText('n →', canvas.width / 2, canvas.height - CONFIG.padding / 2);
 
-  // Y-axis label (x, possibly log scale)
+  // Y-axis label (log scale)
   ctx.save();
   ctx.translate(CONFIG.padding / 2, canvas.height / 2);
   ctx.rotate(-Math.PI / 2);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  const yLabel = useLogScale ? 'log₃(x+1) →' : 'x →';
-  ctx.fillText(yLabel, 0, 0);
+  ctx.fillText('log₃(x+1) →', 0, 0);
   ctx.restore();
 
   // Draw tick labels
@@ -700,25 +770,15 @@ function drawLabels() {
     ctx.fillText(n.toString(), screen.x, canvas.height - CONFIG.padding + 5);
   }
 
-  // Y-axis ticks (x values)
-  if (useLogScale) {
-    // Show powers of 3
-    const maxLog3 = Math.log(maxX + 1) / Math.log(3);
-    for (let i = 0; i <= maxLog3; i++) {
-      const x = Math.pow(3, i) - 1;
-      if (x <= maxX && x >= 0) {
-        const screen = latticeToScreen(0, x);
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(Math.round(x).toString(), CONFIG.padding - 5, screen.y);
-      }
-    }
-  } else {
-    for (let x = 0; x <= maxX; x++) {
+  // Y-axis ticks (show powers of 3)
+  const maxLog3 = Math.log(maxX + 1) / Math.log(3);
+  for (let i = 0; i <= maxLog3; i++) {
+    const x = Math.pow(3, i) - 1;
+    if (x <= maxX && x >= 0) {
       const screen = latticeToScreen(0, x);
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      ctx.fillText(x.toString(), CONFIG.padding - 5, screen.y);
+      ctx.fillText(Math.round(x).toString(), CONFIG.padding - 5, screen.y);
     }
   }
 }
@@ -831,9 +891,17 @@ canvas.addEventListener('mousemove', (e) => {
 
 canvas.addEventListener('click', (e) => {
   if (hoveredPoint) {
+    // Stop animation when user manually clicks
+    if (isAnimating) {
+      stopAnimation();
+    }
+
     // Set as current point (don't regenerate trajectory)
     currentPoint = hoveredPoint;
     currentCircuitValue = SteinerBranches.C(hoveredPoint.n, hoveredPoint.x);
+
+    // Recalculate distances from new current point
+    calculateNodeDistances();
 
     // Update info panel
     updateInfoPanel(hoveredPoint);
@@ -844,7 +912,18 @@ canvas.addEventListener('click', (e) => {
 
 // Keyboard navigation
 document.addEventListener('keydown', (e) => {
+  // Handle animation toggle
+  if (e.key === 's' || e.key === 'S') {
+    toggleAnimation();
+    return;
+  }
+
   if (e.key === 'n' || e.key === 'N' || e.key === 'p' || e.key === 'P') {
+    // Stop animation when user manually navigates
+    if (isAnimating) {
+      stopAnimation();
+    }
+
     if (trajectorySequence.length === 0) return;
 
     // Build ordered list of plotted points from trajectory sequence
@@ -939,6 +1018,9 @@ document.addEventListener('keydown', (e) => {
     currentPoint = plottedPoints[currentIndex];
     currentCircuitValue = SteinerBranches.C(currentPoint.n, currentPoint.x);
 
+    // Recalculate distances from new current point
+    calculateNodeDistances();
+
     // console.log(`New current point: ${currentPoint.branch}(${currentPoint.n},${currentPoint.x})=${currentPoint.value}, index: ${currentIndex}`);
 
     // Update info panel
@@ -955,7 +1037,7 @@ document.addEventListener('keydown', (e) => {
  * Update info panel with point details
  */
 function updateInfoPanel(point) {
-  const info = document.getElementById('info-content');
+  const info = document.getElementById('point-info');
   if (!info) return;
 
   const trajectory = SteinerBranches.trajectory(point.value, 200);
@@ -984,7 +1066,6 @@ function updateInfoPanel(point) {
 // Generate button handler
 document.getElementById('generate').addEventListener('click', () => {
   const startValue = document.getElementById('input-start').value;
-  useLogScale = document.getElementById('log-scale').checked;
   showBoundaries = document.getElementById('show-boundaries').checked;
 
   const start = startValue ? BigInt(startValue) : null;
@@ -999,15 +1080,6 @@ document.getElementById('generate').addEventListener('click', () => {
   initialize(start);
 });
 
-// Log scale checkbox handler
-document.getElementById('log-scale').addEventListener('change', () => {
-  const startValue = document.getElementById('input-start').value;
-  useLogScale = document.getElementById('log-scale').checked;
-
-  const start = startValue ? BigInt(startValue) : null;
-  initialize(start);
-});
-
 // Show boundaries checkbox handler
 document.getElementById('show-boundaries').addEventListener('change', () => {
   showBoundaries = document.getElementById('show-boundaries').checked;
@@ -1016,7 +1088,6 @@ document.getElementById('show-boundaries').addEventListener('change', () => {
 
 // Initialize on load with default value or URL parameter
 window.addEventListener('load', () => {
-  useLogScale = document.getElementById('log-scale').checked;
   showBoundaries = document.getElementById('show-boundaries').checked;
 
   // Check URL for start parameter

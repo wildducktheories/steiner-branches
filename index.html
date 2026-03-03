@@ -3,25 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Steiner Branches Lattice Visualizer</title>
+    <title>Steiner Circuits Lattice</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Steiner Branches Lattice</h1>
-            <p class="subtitle">Visualizing A(n,x), B(n,x), and C(n,x) branch formulas for the Collatz map</p>
+            <h1>Steiner Circuits Lattice</h1>
+            <div class="subtitle">Visualizing A(n,x), B(n,x), and C(n,x) branch formulas for the Collatz map
+            <br>📦 <a href="https://github.com/wildducktheories/steiner-branches" target="_blank" style="color: #ffffff; text-decoration: underline;">Source Code</a> |
+            📄 <a href="https://github.com/wildducktheories/steiner-branches/blob/master/papers/steiner-branches.pdf" target="_blank" style="color: #ffffff; text-decoration: underline;">Paper</a> |
+            📖 <a href="README.md" style="color: #ffffff; text-decoration: underline;">Documentation</a></div>
         </header>
 
         <div class="controls">
             <div class="control-row">
                 <label for="input-start">Start value:</label>
                 <input type="text" id="input-start" placeholder="e.g. 27" value="27">
-
-                <label for="log-scale">
-                    <input type="checkbox" id="log-scale" checked>
-                    Log scale (x-axis)
-                </label>
 
                 <label for="show-boundaries">
                     <input type="checkbox" id="show-boundaries" checked>
@@ -39,9 +37,14 @@
 
             <div class="info-panel">
                 <h2>Information</h2>
-                <div id="info-content">
-                    <p class="instruction">Enter a starting value and click Generate to visualize its Collatz trajectory. Click on any lattice point to see its trajectory.</p>
 
+                <!-- Point-specific information (updated dynamically) -->
+                <div id="point-info">
+                    <p class="instruction">Enter a starting value and click Generate to visualize its Collatz trajectory. Click on any lattice point or use keyboard navigation (n/p) to see its trajectory.</p>
+                </div>
+
+                <!-- Static information (always visible) -->
+                <div id="static-info">
                     <h3>Legend:</h3>
                     <div class="legend">
                         <div class="legend-item">
@@ -57,6 +60,15 @@
                             <span>C(n,x) endpoint (marked =)</span>
                         </div>
                     </div>
+
+                    <h3>Keyboard Controls:</h3>
+                    <ul class="controls-list">
+                        <li><strong>n</strong> - Next point in trajectory</li>
+                        <li><strong>p</strong> - Previous point in trajectory</li>
+                        <li><strong>Shift+N</strong> - Jump to next circuit</li>
+                        <li><strong>Shift+P</strong> - Jump to previous circuit</li>
+                        <li><strong>s</strong> - Toggle animation</li>
+                    </ul>
 
                     <h3>Formulas:</h3>
                     <div class="formulas">
@@ -83,13 +95,18 @@
                     </p>
                     <p class="about">
                         The lattice displays <strong>n</strong> on the x-axis and <strong>x</strong>
-                        on the y-axis (with optional logarithmic scale), since x can be large while
+                        on the y-axis (with logarithmic scale), since x can be large while
                         n typically stays small.
                     </p>
                     <p class="about">
                         Points marked <strong>-</strong> correspond to A(n,x), while points marked
                         <strong>+</strong> correspond to B(n,x). Both branches at a given (n,x)
                         map to the same endpoint C(n,x).
+                    </p>
+                    <p class="about">
+                        The wave visualization shows the selected node in green with larger radius,
+                        while successors appear in blue and predecessors in red, with intensity
+                        and size decreasing with distance from the selected node.
                     </p>
                 </div>
             </div>

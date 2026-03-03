@@ -1,0 +1,38 @@
+version: '3'
+
+vars:
+  PAPER: steiner-branches
+
+tasks:
+  build:
+    desc: Build the paper PDF
+    cmds:
+      - pdflatex {{.PAPER}}.tex
+      - pdflatex {{.PAPER}}.tex
+    sources:
+      - "{{.PAPER}}.tex"
+    generates:
+      - "{{.PAPER}}.pdf"
+
+  clean:
+    desc: Clean LaTeX auxiliary files
+    cmds:
+      - rm -f {{.PAPER}}.aux {{.PAPER}}.log {{.PAPER}}.out {{.PAPER}}.toc {{.PAPER}}.bbl {{.PAPER}}.blg
+
+  clean-all:
+    desc: Clean all generated files including PDF
+    cmds:
+      - task: clean
+      - rm -f {{.PAPER}}.pdf
+
+  view:
+    desc: Open the PDF
+    cmds:
+      - open {{.PAPER}}.pdf
+    preconditions:
+      - test -f {{.PAPER}}.pdf
+
+  default:
+    desc: Build the paper (default task)
+    cmds:
+      - task: build

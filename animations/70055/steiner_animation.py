@@ -101,9 +101,18 @@ class SteinerCircuitsAnimation(Scene):
         start_value = 70055
 
         # Title
-        title = Text("Steiner Circuits: p = 70055", font_size=48)
+        title = Text("Steiner Circuits: m = 70055", font_size=48)
         title.to_edge(UP)
         self.play(Write(title))
+
+        # Formulas on the right side, below title
+        formulas = VGroup(
+            MathTex(r"A(n,x) = \begin{cases} 3 \cdot 2^{n-1} + 2^{n+1} \cdot x - 1 & \text{if } n \text{ odd} \\ 2^{n-1} + 2^{n+1} \cdot x - 1 & \text{if } n \text{ even} \end{cases}", font_size=20),
+            MathTex(r"B(n,x) = \begin{cases} 3 \cdot 2^n + 2^{n+2} \cdot x - 1 & \text{if } n \text{ odd} \\ 2^n + 2^{n+2} \cdot x - 1 & \text{if } n \text{ even} \end{cases}", font_size=20),
+            MathTex(r"C(n,x) = 2 \cdot 3^n \cdot x + 4 \sum_{i=0}^{\lfloor(n-1)/2\rfloor} 9^i", font_size=20)
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.3)
+        formulas.to_edge(RIGHT, buff=0.5).shift(UP * 1.5)
+        self.play(FadeIn(formulas))
         self.wait(0.5)
 
         # Compute trajectory
@@ -157,26 +166,42 @@ class SteinerCircuitsAnimation(Scene):
         self.wait(0.5)
 
         # Animate through trajectory with wave effect
-        info_text = Text("", font_size=24).to_edge(DOWN)
+        # Position info text on right side below formulas
+        # Initialize with a VGroup to match the structure we'll use
+        info_text = VGroup(
+            Text("", font_size=20),
+            Text("", font_size=20),
+            Text("", font_size=20)
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.1)
+        info_text.next_to(formulas, DOWN, aligned_edge=LEFT, buff=0.5)
         self.add(info_text)
+
+        # Track wave dots to remove them each iteration
+        wave_dots = []
+        current_highlight = None
 
         for i, t in enumerate(trajectory):
             pos = lattice_to_screen(t['n'], t['x'])
 
-            # Update info text
-            new_info = Text(
-                f"Step {i}: {t['branch']}({t['n']},{t['x']}) = {t['value']}\nC({t['n']},{t['x']}) = {t['endpoint']}",
-                font_size=20
-            ).to_edge(DOWN)
+            # Remove previous wave dots and highlight
+            if wave_dots:
+                self.remove(*wave_dots)
+                wave_dots = []
+            if current_highlight:
+                self.remove(current_highlight)
+
+            # Update info text - positioned on right side below formulas
+            # Display on separate rows to avoid wrapping
+            # Use Text with font matching (weight="BOLD" approximates the LaTeX look)
+            new_info = VGroup(
+                Text(f"Step {i}:", font_size=20, weight="NORMAL"),
+                Text(f"{t['branch']}({t['n']},{t['x']}) = {t['value']}", font_size=20, weight="NORMAL"),
+                Text(f"C({t['n']},{t['x']}) = {t['endpoint']}", font_size=20, weight="NORMAL")
+            ).arrange(DOWN, aligned_edge=LEFT, buff=0.1)
+            new_info.next_to(formulas, DOWN, aligned_edge=LEFT, buff=0.5)
 
             # Highlight current point (green, large)
             current_highlight = Dot(pos, radius=0.15, color=GREEN, fill_opacity=1.0)
-
-            # Create wave effect for nearby points
-            animations = [
-                Transform(info_text, new_info),
-                FadeIn(current_highlight, scale=0.5)
-            ]
 
             # Add wave effect to surrounding points
             for j in range(max(0, i-5), min(len(trajectory), i+6)):
@@ -198,19 +223,28 @@ class SteinerCircuitsAnimation(Scene):
                     color = interpolate_color(RED, BLACK, 1 - intensity)
 
                 wave_dot = Dot(other_pos, radius=radius, color=color, fill_opacity=0.8)
-                animations.append(FadeIn(wave_dot, run_time=0.2))
+                wave_dots.append(wave_dot)
 
-            self.play(*animations, run_time=0.5)
-            self.wait(0.1)
+            # Add all wave dots and highlight at once (no fade animation)
+            self.add(current_highlight, *wave_dots)
 
-            # Clean up highlights for next iteration
+            # Only animate the info text update
+            self.play(Transform(info_text, new_info), run_time=0.3)
+            self.wait(0.2)
+
+        # Clean up final highlights
+        if wave_dots:
+            self.remove(*wave_dots)
+        if current_highlight:
             self.remove(current_highlight)
 
-        # Final message
-        final_text = Text(
-            f"Trajectory complete: {len(trajectory)} steps\nConverged to 1",
-            font_size=28
-        ).to_edge(DOWN)
+        # Final message - positioned on right side below formulas
+        final_text = VGroup(
+            Text(f"Trajectory complete:", font_size=20, weight="NORMAL"),
+            Text(f"{len(trajectory)} steps", font_size=20, weight="NORMAL"),
+            Text(f"Converged to 1", font_size=20, weight="NORMAL")
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.1)
+        final_text.next_to(formulas, DOWN, aligned_edge=LEFT, buff=0.5)
         self.play(Transform(info_text, final_text))
         self.wait(2)
 
@@ -221,9 +255,18 @@ class SteinerCircuitsStatic(Scene):
         start_value = 70055
 
         # Title
-        title = Text("Steiner Circuits Lattice: p = 70055", font_size=36)
+        title = Text("Steiner Circuits Lattice: m = 70055", font_size=36)
         title.to_edge(UP)
         self.play(Write(title))
+
+        # Formulas on the right side, below title
+        formulas = VGroup(
+            MathTex(r"A(n,x) = \begin{cases} 3 \cdot 2^{n-1} + 2^{n+1} \cdot x - 1 & \text{if } n \text{ odd} \\ 2^{n-1} + 2^{n+1} \cdot x - 1 & \text{if } n \text{ even} \end{cases}", font_size=20),
+            MathTex(r"B(n,x) = \begin{cases} 3 \cdot 2^n + 2^{n+2} \cdot x - 1 & \text{if } n \text{ odd} \\ 2^n + 2^{n+2} \cdot x - 1 & \text{if } n \text{ even} \end{cases}", font_size=20),
+            MathTex(r"C(n,x) = 2 \cdot 3^n \cdot x + 4 \sum_{i=0}^{\lfloor(n-1)/2\rfloor} 9^i", font_size=20)
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.3)
+        formulas.to_edge(RIGHT, buff=0.5).shift(UP * 1.5)
+        self.play(FadeIn(formulas))
 
         # Compute trajectory
         trajectory = compute_trajectory(start_value)
@@ -267,10 +310,13 @@ class SteinerCircuitsStatic(Scene):
         self.play(Create(path), run_time=3)
         self.play(FadeIn(dots), run_time=2)
 
-        # Stats
-        stats = Text(
-            f"Points: {len(trajectory)} | n range: [{n_min}, {n_max}] | x range: [{x_min}, {x_max}]",
-            font_size=20
-        ).to_edge(DOWN)
+        # Stats - positioned on right side below formulas
+        # Display on separate rows to avoid wrapping
+        stats = VGroup(
+            Text(f"Points: {len(trajectory)}", font_size=20, weight="NORMAL"),
+            Text(f"n range: [{n_min}, {n_max}]", font_size=20, weight="NORMAL"),
+            Text(f"x range: [{x_min}, {x_max}]", font_size=20, weight="NORMAL")
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.1)
+        stats.next_to(formulas, DOWN, aligned_edge=LEFT, buff=0.5)
         self.play(Write(stats))
         self.wait(3)

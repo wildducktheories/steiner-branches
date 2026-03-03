@@ -1,6 +1,15 @@
 # Task runner
 .task/
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Manim
+media/
+
 # LaTeX auxiliary files
 *.aux
 *.log

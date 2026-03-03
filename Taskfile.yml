@@ -5,7 +5,11 @@ includes:
     taskfile: ./papers/Taskfile.yml
     dir: ./papers
 
+vars:
+  MANIM_QUALITY: "h"  # h=1080p60, m=720p30, l=480p15, k=4K
+
 tasks:
+  # Paper tasks
   paper:build:
     desc: Build the paper PDF
     cmds:
@@ -31,6 +35,49 @@ tasks:
     cmds:
       - task: papers:build
       - task: papers:view
+
+  # Animation tasks
+  anim:70055:
+    desc: Build p=70055 animation (both scenes)
+    dir: animations/70055
+    cmds:
+      - manim -pq{{.MANIM_QUALITY}} steiner_animation.py
+
+  anim:70055:animated:
+    desc: Build p=70055 animated wave scene
+    dir: animations/70055
+    cmds:
+      - manim -pq{{.MANIM_QUALITY}} steiner_animation.py SteinerCircuitsAnimation
+
+  anim:70055:static:
+    desc: Build p=70055 static overview scene
+    dir: animations/70055
+    cmds:
+      - manim -pq{{.MANIM_QUALITY}} steiner_animation.py SteinerCircuitsStatic
+
+  anim:70055:preview:
+    desc: Quick preview of p=70055 animation (low quality)
+    dir: animations/70055
+    cmds:
+      - manim -pql steiner_animation.py SteinerCircuitsAnimation
+
+  anim:70055:clean:
+    desc: Clean p=70055 animation output
+    dir: animations/70055
+    cmds:
+      - rm -rf media/ __pycache__/
+
+  anim:clean:
+    desc: Clean all animation outputs
+    cmds:
+      - find animations -type d -name "media" -exec rm -rf {} +
+      - find animations -type d -name "__pycache__" -exec rm -rf {} +
+
+  anim:list:
+    desc: List all available animations
+    cmds:
+      - echo "Available animations:"
+      - find animations -name "*.py" -type f
 
   default:
     desc: Show available tasks

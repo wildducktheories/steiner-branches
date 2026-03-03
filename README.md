@@ -2,6 +2,8 @@
 
 An interactive web-based visualization tool for exploring Steiner branch formulas and circuit structures in the Collatz conjecture.
 
+**🌐 [Try it live!](https://wildducktheories.github.io/steiner-branches/)**
+
 ## Overview
 
 This visualization displays the relationship between odd integers in the Collatz map through the lens of Steiner branch formulas A(n,x), B(n,x), and their common endpoint C(n,x). The tool provides an intuitive way to understand how Collatz trajectories flow through different circuits.
